@@ -30,6 +30,8 @@ library(rvest)
     ##     guess_encoding
 
 ``` r
+library(readxl)
+
 set.seed(1)
 ```
 
@@ -269,6 +271,8 @@ sim_mean_sd(n_obs = 40, mu = 150, sigma = 3)
     ##   <dbl> <dbl>
     ## 1  149.  3.10
 
+Same big mu with larger spread since sgma adjusted
+
 ``` r
 sim_mean_sd(n_obs = 40, mu = 150, sigma = 30)
 ```
@@ -313,3 +317,121 @@ sim_mean_sd(50)
     ##    mean    sd
     ##   <dbl> <dbl>
     ## 1  11.8  2.57
+
+## Fix things that bother me
+
+``` r
+fellowship_df =
+  read_excel("Data/LotR_Words.xlsx", range = "B3:D6") |>
+  mutate(movie = "fellowship")
+
+two_tower_df =
+  read_excel("Data/LotR_Words.xlsx", range = "F3:H6") |>
+  mutate(movie = "two_towers")
+
+return_df =
+  read_excel("Data/LotR_Words.xlsx", range = "J3:L6") |>
+  mutate(movie = "return_of_king")
+```
+
+## Creating function to make reading files easier
+
+Inputs are thing you had to change, e.g. movie, range
+
+``` r
+# lotr_import = function(cell_range, movie_title) {
+#  
+#  lotr_movie_df = 
+#    read_excel("Data/LotR_Words.xlsx", range = cell_range) |>
+#    mutate(movie = movie_title)
+#  
+#  return(lotr_movie_df)
+#}
+```
+
+Don’t run these on knitting
+
+``` r
+z_scores(iris)
+z_scores("my name is jeff")
+z_scores(c(TRUE, TRUE, FALSE, FALSE))
+z_scores(3)
+```
+
+## Let’s try importing files. with functions!
+
+``` r
+source("source/lotr_import.R")
+
+fellowship_df =
+  lotr_import(cell_range = "B3:D6", movie_title = "fellowship")
+
+two_tower_df =
+  lotr_import(cell_range = "F3:H6", movie_title = "two_towers")
+
+return_df =
+  lotr_import(cell_range = "J3:L6", movie_title = "return_of_king")
+```
+
+## Trying with website data
+
+``` r
+url = "https://www.samhsa.gov/data/sites/default/files/NSDUHsaeShortTermCHG2015/NSDUHsaeShortTermCHG2015.htm"
+
+drug_use_html = read_html(url)
+
+marj_df = 
+  drug_use_html |> 
+  html_table() |> 
+  nth(1) |>
+  slice(-1) |> 
+  select(-contains("P Value")) |>
+  pivot_longer(
+    -State,
+    names_to = "age_year", 
+    values_to = "percent") |>
+  separate(age_year, into = c("age", "year"), sep = "\\(") |>
+  mutate(
+    year = str_replace(year, "\\)", ""),
+    percent = str_replace(percent, "[a-c]$", ""),
+    percent = as.numeric(percent)) |>
+  filter(!(State %in% c("Total U.S.", "Northeast", "Midwest", "South", "West")))
+
+
+# this is a lot to do, so maybe we try something else -> a function!
+cocaine_df = 
+  drug_use_html |> 
+  html_table() |> 
+  nth(4) |>
+  slice(-1) |> 
+  select(-contains("P Value")) |>
+  pivot_longer(
+    -State,
+    names_to = "age_year", 
+    values_to = "percent") |>
+  separate(age_year, into = c("age", "year"), sep = "\\(") |>
+  mutate(
+    year = str_replace(year, "\\)", ""),
+    percent = str_replace(percent, "[a-c]$", ""),
+    percent = as.numeric(percent)) |>
+  filter(!(State %in% c("Total U.S.", "Northeast", "Midwest", "South", "West")))
+```
+
+Instead!
+
+``` r
+url = "https://www.samhsa.gov/data/sites/default/files/NSDUHsaeShortTermCHG2015/NSDUHsaeShortTermCHG2015.htm"
+
+drug_use_html = read_html(url)
+
+source("source/nsduh_process.R")
+
+marj_df =
+  nsduh_process(html = drug_use_html, table_num = 1)
+
+cocaine_df =
+  nsduh_process(html = drug_use_html, table_num = 3)
+
+heroine_df =
+  nsduh_process(html = drug_use_html, table_num = 4)
+```
